@@ -1,0 +1,103 @@
+services:
+  gateway:
+    container_name: Gateway
+    image: ${DOCKER_REGISTRY-}gateway
+    build:
+      context: .
+      dockerfile: src/Gateway/Dockerfile
+  write.api:
+    container_name: WriteApi
+    hostname: write.api
+    image: ${DOCKER_REGISTRY-}writeapi
+    build:
+      context: .
+      dockerfile: src/Write.Api/Dockerfile
+  write.database:
+    container_name: WriteDatabase
+    hostname: write.database
+    image: "postgres"
+    environment:
+      POSTGRES_USER: "postgres"
+      POSTGRES_PASSWORD: "P@ssw0rd!"
+      POSTGRES_DB: Products
+    command:
+      - "postgres"
+      - "-c"
+      - "wal_level=logical"
+    ports:
+      - "5432:5432"
+  read.api:
+    container_name: ReadApi
+    hostname: read.api
+    image: ${DOCKER_REGISTRY-}readapi
+    build:
+      context: .
+      dockerfile: src/Read.Api/Dockerfile
+  read.database:
+    container_name: ReadDatabase
+    hostname: read.database
+    image: "mongo"
+    ports:
+      - "27017:27017"
+  consumer:
+    container_name: Consumer
+    image: ${DOCKER_REGISTRY-}consumer
+    build:
+      context: .
+      dockerfile: src/Consumer/Dockerfile
+    depends_on:
+      - zookeeper
+      - broker
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.0.1
+    container_name: zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+  broker:
+    image: confluentinc/cp-kafka:7.0.1
+    container_name: broker
+    ports:
+      - "9092:9092"
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092,PLAINTEXT_INTERNAL://broker:29092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+  connect:
+    image: debezium/connect
+    container_name: Connect
+    ports:
+      - 8083:8083
+    environment:
+      - BOOTSTRAP_SERVERS=broker:29092
+      - GROUP_ID=1
+      - CONFIG_STORAGE_TOPIC=my_connect_configs
+      - OFFSET_STORAGE_TOPIC=my_connect_offsets
+      - STATUS_STORAGE_TOPIC=my_connect_statuses
+    depends_on:
+      - zookeeper
+      - broker
+  kafka-ui:
+    image: provectuslabs/kafka-ui
+    container_name: KafkaUI
+    ports:
+      - "8090:8090"
+    restart: always
+    environment:
+      - SERVER_PORT=8090
+      - KAFKA_CLUSTERS_0_NAME=localhost
+      - KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=broker:29092
+  debezium-ui:
+    image: debezium/debezium-ui
+    container_name: DebeziumUI
+    ports:
+      - "8080:8080"
+    restart: always
+    environment:
+      - KAFKA_CONNECT_URIS=http://connect:8083
