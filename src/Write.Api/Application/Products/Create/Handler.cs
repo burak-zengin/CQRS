@@ -14,6 +14,6 @@ public class Handler(IProductWriteRepository repository) : IRequestHandler<Comma
             Color = request.Color,
             Name = request.Name,
             Size = request.Size
-        });
+        }, cancellationToken);
     }
 }

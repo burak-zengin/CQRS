@@ -16,9 +16,9 @@ public class ProductRepository : IProductWriteRepository
         _collection = database.GetCollection<Product>("ProductCollection");
     }
 
-    public async Task<int> CreateAsync(Product product)
+    public async Task<int> CreateAsync(Product product, CancellationToken cancellationToken)
     {
-        await _collection.InsertOneAsync(product);
+        await _collection.InsertOneAsync(product, cancellationToken);
 
         return product.Id;
     }

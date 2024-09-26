@@ -8,6 +8,6 @@ public class Handler(IProductReadRepository repository) : IRequestHandler<Query,
 {
     public async Task<Product> Handle(Query request, CancellationToken cancellationToken)
     {
-        return await repository.GetAsync(request.Id);
+        return await repository.GetAsync(request.Id, cancellationToken);
     }
 }
