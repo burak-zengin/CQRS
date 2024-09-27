@@ -10,7 +10,8 @@
         }
       ],
       "UpstreamPathTemplate": "/api",
-      "UpstreamHttpMethod": [ "Post" ]
+      "UpstreamHttpMethod": [ "Post" ],
+      "SwaggerKey": "ProductsWrite"
     },
     {
       "DownstreamPathTemplate": "/api",
@@ -22,7 +23,8 @@
         }
       ],
       "UpstreamPathTemplate": "/api",
-      "UpstreamHttpMethod": [ "Get" ]
+      "UpstreamHttpMethod": [ "Get" ],
+      "SwaggerKey": "ProductsRead"
     },
     {
       "DownstreamPathTemplate": "/api/{id}",
@@ -34,10 +36,33 @@
         }
       ],
       "UpstreamPathTemplate": "/api/{id}",
-      "UpstreamHttpMethod": [ "Get" ]
+      "UpstreamHttpMethod": [ "Get" ],
+      "SwaggerKey": "ProductsRead"
     }
   ],
   "GlobalConfiguration": {
     "BaseUrl": "https://localhost:7000"
-  }
+  },
+  "SwaggerEndPoints": [
+    {
+      "Key": "ProductsWrite",
+      "Config": [
+        {
+          "Name": "Products Write API",
+          "Version": "v1",
+          "Url": "http://write.api:80/swagger/v1/swagger.json"
+        }
+      ]
+    },
+    {
+      "Key": "ProductsRead",
+      "Config": [
+        {
+          "Name": "Products Read API",
+          "Version": "v1",
+          "Url": "http://read.api:80/swagger/v1/swagger.json"
+        }
+      ]
+    }
+  ]
 }

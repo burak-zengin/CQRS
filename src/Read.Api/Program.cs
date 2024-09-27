@@ -9,6 +9,8 @@ builder.Services.AddMediatR(configuration =>
     configuration.RegisterServicesFromAssembly(Assembly.GetExecutingAssembly());
 });
 builder.Services.AddScoped<IProductReadRepository, ProductRepository>();
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
 app.MapGet("/api/{id}", async (
@@ -24,4 +26,6 @@ app.MapGet("/api", async (
 {
     return await mediator.Send(new Read.Api.Application.Products.GetAll.Query(), cancellationToken);
 });
+app.UseSwagger();
+app.UseSwaggerUI();
 app.Run();

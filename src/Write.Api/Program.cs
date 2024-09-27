@@ -12,6 +12,8 @@ builder.Services.AddMediatR(configuration =>
 {
     configuration.RegisterServicesFromAssembly(Assembly.GetExecutingAssembly());
 });
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
 app.MapPost("/api", async (
@@ -21,4 +23,6 @@ app.MapPost("/api", async (
 {
     return await mediator.Send(command, cancellationToken);
 });
+app.UseSwagger();
+app.UseSwaggerUI();
 app.Run();
