@@ -1,23 +1,18 @@
 ﻿using Domain.Products;
 using Domain.Products.Repositories;
 using MediatR;
-using Write.Api.Application.Common;
 
 namespace Write.Api.Application.Products.Create;
 
-public class Handler(IProductWriteRepository repository, IPublisher publisher)
-    : IRequestHandler<Command, int>
+public class Handler(IProductWriteRepository repository) : IRequestHandler<Command, Guid>
 {
-    public async Task<int> Handle(Command request, CancellationToken cancellationToken)
+    public async Task<Guid> Handle(Command request, CancellationToken cancellationToken)
     {
-        var product = Product.Create(request.Name, request.Barcode, request.Color, request.Size);
+        var product = Product.Create(request.Name);
 
-        var id = await repository.CreateAsync(product, cancellationToken);
+        await repository.AddAsync(product, cancellationToken);
+        await repository.SaveChangesAsync(cancellationToken);
 
-        product.MarkCreated();
-        await DomainEventDispatcher.PublishAllAsync(publisher, product.DomainEvents, cancellationToken);
-        product.ClearDomainEvents();
-
-        return id;
+        return product.Id.Value;
     }
 }

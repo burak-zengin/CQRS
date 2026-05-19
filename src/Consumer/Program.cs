@@ -1,31 +1,47 @@
-﻿using Confluent.Kafka;
+﻿using System.Text;
+using System.Text.Json;
+using Confluent.Kafka;
+using Confluent.Kafka.Admin;
 using Consumer.Infrastructure.Messaging;
 using Consumer.Infrastructure.Persistence;
 using Consumer.Infrastructure.Projections;
 using Consumer.Infrastructure.Repositories;
-using Domain.Products.IntegrationEvents;
 using Domain.Products.Projections;
 using Domain.Products.Repositories;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using System.Text.Json;
 
 MongoConfiguration.RegisterClassMaps();
+
+var environment = Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT")
+    ?? Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT")
+    ?? "Production";
 
 var configuration = new ConfigurationBuilder()
     .SetBasePath(Directory.GetCurrentDirectory())
     .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
+    .AddJsonFile($"appsettings.{environment}.json", optional: true, reloadOnChange: true)
+    .AddEnvironmentVariables()
     .Build();
 
 var services = new ServiceCollection();
 services.AddSingleton<IConfiguration>(configuration);
 services.AddSingleton<IProductProjector, ProductProjector>();
+services.AddSingleton<IProductListProjector, ProductListProjector>();
 services.AddScoped<IProductProjectionRepository, ProductProjectionRepository>();
+services.AddScoped<IntegrationEventDispatcher>();
 var serviceProvider = services.BuildServiceProvider();
 
 var bootstrapServers = configuration["Kafka:BootstrapServers"] ?? "broker:29092";
 var groupId = configuration["Kafka:GroupId"] ?? "product-projection-consumer";
-var topic = configuration["Kafka:Topic"] ?? "datatransfer.public.Products";
+var topic = configuration["Kafka:Topic"] ?? "outbox.event.Product";
+var mongoConnection = configuration.GetConnectionString("MongoDb") ?? "(not set)";
+
+Console.WriteLine($"[Consumer] Environment={environment}");
+Console.WriteLine($"[Consumer] Kafka={bootstrapServers}, Topic={topic}, Group={groupId}");
+Console.WriteLine($"[Consumer] MongoDB={mongoConnection}");
+
+await LogTopicDiagnosticsAsync(bootstrapServers, topic);
 
 var cancellationSource = new CancellationTokenSource();
 Console.CancelKeyPress += (_, e) =>
@@ -42,16 +58,16 @@ var consumerConfig = new ConsumerConfig
     EnableAutoCommit = false
 };
 
-using var consumer = new ConsumerBuilder<Ignore, string>(consumerConfig).Build();
+using var consumer = new ConsumerBuilder<string, string>(consumerConfig).Build();
 consumer.Subscribe(topic);
 
-Console.WriteLine($"[Consumer] Listening topic '{topic}' on {bootstrapServers}...");
+Console.WriteLine($"[Consumer] Listening topic '{topic}' on {bootstrapServers} (group: {groupId})...");
 
 try
 {
     while (!cancellationSource.IsCancellationRequested)
     {
-        ConsumeResult<Ignore, string>? result;
+        ConsumeResult<string, string>? result;
         try
         {
             result = consumer.Consume(cancellationSource.Token);
@@ -66,15 +82,29 @@ try
             continue;
         }
 
-        if (result?.Message?.Value is null)
+        if (result is null)
         {
+            continue;
+        }
+
+        LogIncomingMessage(result);
+
+        if (result.Message.Value is null)
+        {
+            // Tombstones / delete records on the outbox table -- skip but commit to avoid stuck partition.
+            Console.WriteLine(
+                $"[Consumer] Null value at {result.Topic}[{result.Partition}]@{result.Offset} -- committing offset.");
+            consumer.Commit(result);
             continue;
         }
 
         try
         {
-            await HandleAsync(result.Message.Value, cancellationSource.Token);
-            consumer.Commit(result);
+            var committed = await HandleAsync(result, cancellationSource.Token);
+            if (committed)
+            {
+                consumer.Commit(result);
+            }
         }
         catch (Exception ex)
         {
@@ -87,46 +117,173 @@ finally
     consumer.Close();
 }
 
-async Task HandleAsync(string raw, CancellationToken cancellationToken)
+static void LogIncomingMessage(ConsumeResult<string, string> result)
 {
-    DebeziumEnvelope<DebeziumProduct>? envelope;
-    try
+    var headers = FormatHeaders(result.Message.Headers);
+    var valuePreview = result.Message.Value is { Length: > 200 } v
+        ? v[..200] + "..."
+        : result.Message.Value;
+
+    Console.WriteLine(
+        $"[Consumer] Received {result.Topic}[{result.Partition}]@{result.Offset} " +
+        $"key='{result.Message.Key}' valueLen={result.Message.Value?.Length ?? 0} headers=[{headers}]");
+    if (valuePreview is not null)
     {
-        envelope = JsonSerializer.Deserialize<DebeziumEnvelope<DebeziumProduct>>(raw);
+        Console.WriteLine($"[Consumer]   payload preview: {valuePreview}");
     }
-    catch (JsonException ex)
+}
+
+static string FormatHeaders(Headers? headers)
+{
+    if (headers is null || headers.Count == 0)
     {
-        Console.Error.WriteLine($"[Consumer] Invalid JSON payload: {ex.Message}");
-        return;
+        return "(none)";
     }
 
-    var integrationEvent = DebeziumEnvelopeMapper.Map(envelope);
-    if (integrationEvent is null || integrationEvent.Operation == ProductOperation.Unknown)
+    return string.Join(", ", headers.Select(h =>
+        $"{h.Key}={Encoding.UTF8.GetString(h.GetValueBytes())}"));
+}
+
+async Task<bool> HandleAsync(ConsumeResult<string, string> result, CancellationToken cancellationToken)
+{
+    var headers = result.Message.Headers;
+
+    if (!TryReadHeader(headers, "eventType", out var eventType))
     {
-        return;
+        Console.Error.WriteLine("[Consumer] Missing 'eventType' header -- cannot dispatch.");
+        return false;
+    }
+
+    if (!TryResolveEventId(headers, result.Message.Value, out var eventId))
+    {
+        Console.Error.WriteLine("[Consumer] Missing event id (header 'id' and payload 'Id') -- cannot dispatch.");
+        return false;
     }
 
     using var scope = serviceProvider.CreateScope();
-    var projector = scope.ServiceProvider.GetRequiredService<IProductProjector>();
-    var projection = scope.ServiceProvider.GetRequiredService<IProductProjectionRepository>();
+    var projectionRepository = scope.ServiceProvider.GetRequiredService<IProductProjectionRepository>();
+    var dispatcher = scope.ServiceProvider.GetRequiredService<IntegrationEventDispatcher>();
 
-    var currentVersion = await projection.GetCurrentVersionAsync(integrationEvent.ProductId, cancellationToken);
-    if (currentVersion is { } v && integrationEvent.Version <= v)
+    if (await projectionRepository.HasProcessedAsync(eventId, cancellationToken))
     {
-        return;
+        Console.WriteLine($"[Consumer] Already processed event {eventId} -- committing offset.");
+        return true;
     }
 
-    switch (integrationEvent.Operation)
-    {
-        case ProductOperation.Created:
-        case ProductOperation.Updated:
-        case ProductOperation.Snapshot:
-            var readModel = projector.Project(integrationEvent);
-            await projection.UpsertAsync(readModel, cancellationToken);
-            break;
+    await dispatcher.DispatchAsync(eventType, result.Message.Value, cancellationToken);
+    await projectionRepository.MarkProcessedAsync(eventId, cancellationToken);
+    return true;
+}
 
-        case ProductOperation.Deleted:
-            await projection.DeleteAsync(integrationEvent.ProductId, cancellationToken);
-            break;
+static bool TryResolveEventId(Headers? headers, string? payload, out Guid eventId)
+{
+    if (TryReadHeader(headers, "id", out var idRaw) && Guid.TryParse(idRaw, out eventId))
+    {
+        return true;
+    }
+
+    if (TryReadHeader(headers, "Id", out idRaw) && Guid.TryParse(idRaw, out eventId))
+    {
+        return true;
+    }
+
+    if (string.IsNullOrWhiteSpace(payload))
+    {
+        eventId = default;
+        return false;
+    }
+
+    try
+    {
+        using var doc = JsonDocument.Parse(payload);
+        if (doc.RootElement.TryGetProperty("Id", out var idElement)
+            && idElement.ValueKind == JsonValueKind.String
+            && Guid.TryParse(idElement.GetString(), out eventId))
+        {
+            return true;
+        }
+    }
+    catch (JsonException)
+    {
+        // fall through
+    }
+
+    eventId = default;
+    return false;
+}
+
+static bool TryReadHeader(Headers? headers, string key, out string value)
+{
+    value = string.Empty;
+    if (headers is null)
+    {
+        return false;
+    }
+
+    if (!headers.TryGetLastBytes(key, out var bytes) || bytes is null)
+    {
+        return false;
+    }
+
+    value = Encoding.UTF8.GetString(bytes);
+    return true;
+}
+
+static async Task LogTopicDiagnosticsAsync(string bootstrapServers, string topic)
+{
+    try
+    {
+        using var admin = new AdminClientBuilder(new AdminClientConfig
+        {
+            BootstrapServers = bootstrapServers
+        }).Build();
+
+        var metadata = admin.GetMetadata(topic, TimeSpan.FromSeconds(10));
+        var topicMeta = metadata.Topics.FirstOrDefault(t => t.Topic == topic);
+
+        if (topicMeta is null)
+        {
+            Console.WriteLine(
+                $"[Consumer] WARNING: Topic '{topic}' does not exist on {bootstrapServers}. " +
+                "Debezium has not published yet, or connector route/topic name is wrong.");
+            return;
+        }
+
+        if (topicMeta.Partitions.Count == 0)
+        {
+            Console.WriteLine($"[Consumer] WARNING: Topic '{topic}' has no partitions.");
+            return;
+        }
+
+        using var consumer = new ConsumerBuilder<string, string>(new ConsumerConfig
+        {
+            BootstrapServers = bootstrapServers,
+            GroupId = $"diag-{Guid.NewGuid():N}"
+        }).Build();
+
+        var watermarkTasks = topicMeta.Partitions
+            .Select(p => consumer.QueryWatermarkOffsets(
+                new TopicPartition(topic, p.PartitionId),
+                TimeSpan.FromSeconds(10)))
+            .ToArray();
+
+        var totalMessages = watermarkTasks.Sum(w => (long)(w.High.Value - w.Low.Value));
+
+        Console.WriteLine(
+            $"[Consumer] Topic '{topic}' exists with {topicMeta.Partitions.Count} partition(s), " +
+            $"~{totalMessages} message(s) in log (high-low watermarks).");
+
+        if (totalMessages == 0)
+        {
+            Console.WriteLine(
+                "[Consumer] Topic is EMPTY. After a Write API command, check Debezium connector " +
+                "and Postgres WAL/outbox inserts (table stays empty by design).");
+        }
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine(
+            $"[Consumer] WARNING: Could not reach Kafka at '{bootstrapServers}': {ex.Message}. " +
+            "If running Consumer locally, use localhost:9092 (appsettings.Development.json).");
     }
 }

@@ -16,8 +16,8 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
-app.MapGet("/api/{id}", async (
-    int id,
+app.MapGet("/api/{id:guid}", async (
+    Guid id,
     IMediator mediator,
     CancellationToken cancellationToken) =>
 {

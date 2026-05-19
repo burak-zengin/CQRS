@@ -1,5 +1,7 @@
 using Domain.Products.ReadModels;
+using MongoDB.Bson;
 using MongoDB.Bson.Serialization;
+using MongoDB.Bson.Serialization.Serializers;
 
 namespace Consumer.Infrastructure.Persistence;
 
@@ -7,15 +9,33 @@ public static class MongoConfiguration
 {
     public static void RegisterClassMaps()
     {
-        if (BsonClassMap.IsClassMapRegistered(typeof(ProductReadModel)))
+        // Persist Guid as String for portability and easy log inspection across services.
+        BsonSerializer.TryRegisterSerializer(new GuidSerializer(BsonType.String));
+
+        if (!BsonClassMap.IsClassMapRegistered(typeof(ProductDetailVariantItem)))
         {
-            return;
+            BsonClassMap.RegisterClassMap<ProductDetailVariantItem>(cm =>
+            {
+                cm.AutoMap();
+            });
         }
 
-        BsonClassMap.RegisterClassMap<ProductReadModel>(cm =>
+        if (!BsonClassMap.IsClassMapRegistered(typeof(ProductDetailReadModel)))
         {
-            cm.AutoMap();
-            cm.MapIdMember(c => c.Id);
-        });
+            BsonClassMap.RegisterClassMap<ProductDetailReadModel>(cm =>
+            {
+                cm.AutoMap();
+                cm.MapIdMember(c => c.Id);
+            });
+        }
+
+        if (!BsonClassMap.IsClassMapRegistered(typeof(ProductListReadModel)))
+        {
+            BsonClassMap.RegisterClassMap<ProductListReadModel>(cm =>
+            {
+                cm.AutoMap();
+                cm.MapIdMember(c => c.Id);
+            });
+        }
     }
 }

@@ -1,6 +1,6 @@
 namespace Domain.Products.ValueObjects;
 
-public readonly record struct Barcode
+public sealed record class Barcode
 {
     private const int MinLength = 8;
     private const int MaxLength = 14;

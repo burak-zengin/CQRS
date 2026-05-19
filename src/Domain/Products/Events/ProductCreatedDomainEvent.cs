@@ -1,6 +1,9 @@
 namespace Domain.Products.Events;
 
-public sealed record ProductCreatedDomainEvent(int ProductId, string Barcode) : IDomainEvent
+public sealed record ProductCreatedDomainEvent(
+    Guid ProductId,
+    string Name,
+    ProductStatus Status) : IDomainEvent
 {
     public Guid EventId { get; } = Guid.NewGuid();
 

@@ -3,4 +3,4 @@ using MediatR;
 
 namespace Read.Api.Application.Products.GetAll;
 
-public record Query : IRequest<List<ProductReadModel>>;
+public record Query : IRequest<List<ProductListReadModel>>;

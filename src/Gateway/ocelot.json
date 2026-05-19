@@ -14,6 +14,84 @@
       "SwaggerKey": "ProductsWrite"
     },
     {
+      "DownstreamPathTemplate": "/api/{id}/name",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "write.api",
+          "Port": 80
+        }
+      ],
+      "UpstreamPathTemplate": "/api/{id}/name",
+      "UpstreamHttpMethod": [ "Put" ],
+      "SwaggerKey": "ProductsWrite"
+    },
+    {
+      "DownstreamPathTemplate": "/api/{id}/activate",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "write.api",
+          "Port": 80
+        }
+      ],
+      "UpstreamPathTemplate": "/api/{id}/activate",
+      "UpstreamHttpMethod": [ "Post" ],
+      "SwaggerKey": "ProductsWrite"
+    },
+    {
+      "DownstreamPathTemplate": "/api/{id}/archive",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "write.api",
+          "Port": 80
+        }
+      ],
+      "UpstreamPathTemplate": "/api/{id}/archive",
+      "UpstreamHttpMethod": [ "Post" ],
+      "SwaggerKey": "ProductsWrite"
+    },
+    {
+      "DownstreamPathTemplate": "/api/{id}/variants",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "write.api",
+          "Port": 80
+        }
+      ],
+      "UpstreamPathTemplate": "/api/{id}/variants",
+      "UpstreamHttpMethod": [ "Post" ],
+      "SwaggerKey": "ProductsWrite"
+    },
+    {
+      "DownstreamPathTemplate": "/api/{id}/variants/{variantId}",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "write.api",
+          "Port": 80
+        }
+      ],
+      "UpstreamPathTemplate": "/api/{id}/variants/{variantId}",
+      "UpstreamHttpMethod": [ "Delete" ],
+      "SwaggerKey": "ProductsWrite"
+    },
+    {
+      "DownstreamPathTemplate": "/api/{id}/variants/{variantId}/price",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "write.api",
+          "Port": 80
+        }
+      ],
+      "UpstreamPathTemplate": "/api/{id}/variants/{variantId}/price",
+      "UpstreamHttpMethod": [ "Put" ],
+      "SwaggerKey": "ProductsWrite"
+    },
+    {
       "DownstreamPathTemplate": "/api",
       "DownstreamScheme": "http",
       "DownstreamHostAndPorts": [

@@ -4,10 +4,10 @@ using MediatR;
 
 namespace Read.Api.Application.Products.Get;
 
-public class Handler(IProductReadRepository repository) : IRequestHandler<Query, ProductReadModel?>
+public class Handler(IProductReadRepository repository) : IRequestHandler<Query, ProductDetailReadModel?>
 {
-    public async Task<ProductReadModel?> Handle(Query request, CancellationToken cancellationToken)
+    public async Task<ProductDetailReadModel?> Handle(Query request, CancellationToken cancellationToken)
     {
-        return await repository.GetAsync(request.Id, cancellationToken);
+        return await repository.GetDetailAsync(request.Id, cancellationToken);
     }
 }

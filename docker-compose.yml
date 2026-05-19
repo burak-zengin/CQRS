@@ -67,6 +67,10 @@ services:
     build:
       context: .
       dockerfile: src/Consumer/Dockerfile
+    environment:
+      - DOTNET_ENVIRONMENT=Production
+      - Kafka__BootstrapServers=broker:29092
+      - ConnectionStrings__MongoDb=mongodb://read.database:27017/
     depends_on:
       - broker
       - read.database
