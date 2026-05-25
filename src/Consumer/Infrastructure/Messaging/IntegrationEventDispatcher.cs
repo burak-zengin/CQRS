@@ -147,7 +147,6 @@ public sealed class IntegrationEventDispatcher
                 $"Cannot project event for missing product '{productId}'.");
         }
 
-        // Out-of-order / replay guard: only apply events strictly newer than the current projection.
         var eventVersion = versionSelector(@event);
         if (eventVersion <= existing.Version)
         {
@@ -164,11 +163,6 @@ public sealed class IntegrationEventDispatcher
             $"{existing.Version} -> {eventVersion}");
     }
 
-    /// <summary>
-    /// Single write-fan-out: detail is the canonical projection, list is derived from it.
-    /// Keeping both writes in the same dispatcher call ensures the two views stay consistent
-    /// for a given event, even if they live in different Mongo collections.
-    /// </summary>
     private async Task PersistAsync(ProductDetailReadModel detail, CancellationToken cancellationToken)
     {
         var list = _listProjector.Project(detail);

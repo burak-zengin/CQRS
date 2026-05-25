@@ -1,6 +1,7 @@
 using Domain.Products.Repositories;
 using FluentValidation;
 using MediatR;
+using Microsoft.OpenApi;
 using System.Reflection;
 using Write.Api.Application.Behaviors;
 using Write.Api.Infrastructure.ExceptionHandling;
@@ -31,7 +32,15 @@ builder.Services.AddExceptionHandler<ValidationExceptionHandler>();
 builder.Services.AddProblemDetails();
 
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddSwaggerGen(options =>
+{
+    options.SwaggerDoc("v1", new OpenApiInfo
+    {
+        Title = "Write API",
+        Version = "v1",
+        Description = "Product write (command) operations"
+    });
+});
 
 var app = builder.Build();
 
@@ -44,7 +53,10 @@ app.MapPost("/api", async (
 {
     var id = await mediator.Send(command, cancellationToken);
     return Results.Created($"/api/{id}", new { id });
-});
+})
+.WithTags("Products")
+.WithSummary("Create product")
+.WithDescription("Creates a new product and returns the generated product id.");
 
 app.MapPut("/api/{id:guid}/name", async (
     IMediator mediator,
@@ -54,7 +66,10 @@ app.MapPut("/api/{id:guid}/name", async (
 {
     await mediator.Send(new RenameCommand(id, body.Name), cancellationToken);
     return Results.NoContent();
-});
+})
+.WithTags("Products")
+.WithSummary("Rename product")
+.WithDescription("Updates the name of the specified product.");
 
 app.MapPost("/api/{id:guid}/activate", async (
     IMediator mediator,
@@ -63,7 +78,10 @@ app.MapPost("/api/{id:guid}/activate", async (
 {
     await mediator.Send(new ActivateCommand(id), cancellationToken);
     return Results.NoContent();
-});
+})
+.WithTags("Products")
+.WithSummary("Activate product")
+.WithDescription("Sets the specified product to active status.");
 
 app.MapPost("/api/{id:guid}/archive", async (
     IMediator mediator,
@@ -72,7 +90,10 @@ app.MapPost("/api/{id:guid}/archive", async (
 {
     await mediator.Send(new ArchiveCommand(id), cancellationToken);
     return Results.NoContent();
-});
+})
+.WithTags("Products")
+.WithSummary("Archive product")
+.WithDescription("Archives the specified product.");
 
 app.MapPost("/api/{id:guid}/variants", async (
     IMediator mediator,
@@ -91,7 +112,10 @@ app.MapPost("/api/{id:guid}/variants", async (
             body.Currency),
         cancellationToken);
     return Results.Created($"/api/{id}/variants/{variantId}", new { id = variantId });
-});
+})
+.WithTags("Products")
+.WithSummary("Add variant")
+.WithDescription("Adds a new variant (SKU, barcode, color, size, price) to the product.");
 
 app.MapDelete("/api/{id:guid}/variants/{variantId:guid}", async (
     IMediator mediator,
@@ -101,7 +125,10 @@ app.MapDelete("/api/{id:guid}/variants/{variantId:guid}", async (
 {
     await mediator.Send(new RemoveVariantCommand(id, variantId), cancellationToken);
     return Results.NoContent();
-});
+})
+.WithTags("Products")
+.WithSummary("Remove variant")
+.WithDescription("Removes a variant from the specified product.");
 
 app.MapPut("/api/{id:guid}/variants/{variantId:guid}/price", async (
     IMediator mediator,
@@ -114,7 +141,10 @@ app.MapPut("/api/{id:guid}/variants/{variantId:guid}/price", async (
         new ChangePriceCommand(id, variantId, body.Amount, body.Currency),
         cancellationToken);
     return Results.NoContent();
-});
+})
+.WithTags("Products")
+.WithSummary("Update variant price")
+.WithDescription("Updates the price and currency of the specified variant.");
 
 app.UseSwagger();
 app.UseSwaggerUI();

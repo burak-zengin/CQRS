@@ -1,4 +1,4 @@
-namespace Domain.Products.Events;
+namespace Domain.Common;
 
 public interface IDomainEvent
 {

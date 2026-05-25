@@ -124,8 +124,6 @@ public class WriteDbContext : DbContext
 
         modelBuilder.Entity<OutboxMessage>(entity =>
         {
-            // Lowercase unquoted name: Debezium/pgoutput matches publication + table.include.list reliably.
-            // EF's default "OutboxMessages" is case-sensitive and often never reaches Kafka.
             entity.ToTable("outbox_messages");
             entity.HasKey(m => m.Id);
             entity.Property(m => m.AggregateType).IsRequired().HasMaxLength(100);
@@ -133,11 +131,6 @@ public class WriteDbContext : DbContext
             entity.Property(m => m.Type).IsRequired().HasMaxLength(100);
             entity.Property(m => m.Payload).IsRequired().HasColumnType("text");
 
-            // Stored as `timestamp without time zone` so that Debezium maps it to
-            // io.debezium.time.MicroTimestamp (INT64 with a logical schema name).
-            // The EventRouter SMT requires that logical name -- it rejects both
-            // `timestamp with time zone` (-> ZonedTimestamp STRING) and plain `bigint`
-            // (-> INT64 without a logical name).
             entity.Property(m => m.OccurredAt)
                 .HasConversion(
                     v => DateTime.SpecifyKind(v.UtcDateTime, DateTimeKind.Unspecified),

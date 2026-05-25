@@ -1,3 +1,5 @@
+using Domain.Common;
+
 namespace Domain.Products.Events;
 
 public sealed record ProductVariantAddedDomainEvent(

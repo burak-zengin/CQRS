@@ -1,10 +1,5 @@
 namespace Domain.Products.ReadModels;
 
-/// <summary>
-/// Lean read-side projection optimized for the product list / search view.
-/// Variants are not included; instead aggregated and filter-friendly fields
-/// (color/size options, price range, availability) are pre-computed.
-/// </summary>
 public sealed class ProductListReadModel
 {
     public Guid Id { get; init; }

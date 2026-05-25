@@ -34,26 +34,14 @@ public class ProductRepository(WriteDbContext context) : IProductWriteRepository
 
         await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
 
-        // Phase 1: persist aggregate changes. With strongly-typed Guid IDs already assigned in the
-        // domain, we no longer rely on DB identity columns -- this also fixes the prior Id=0 bug
-        // when raising creation events.
         await context.SaveChangesAsync(cancellationToken);
 
-        // Phase 2: derive integration events from domain events and append outbox rows in the SAME transaction.
-        // Each event must carry the aggregate version AT THE MOMENT IT WAS RAISED -- not the final
-        // post-save version. Otherwise multi-event saves emit events that all share the final version,
-        // and the consumer's replay guard (`event.Version <= existing.Version`) silently drops everything
-        // except the first one.
         var outboxMessages = new List<OutboxMessage>();
         foreach (var aggregate in aggregates)
         {
-            var preSaveVersion = aggregate.Version - aggregate.DomainEvents.Count;
-            var eventIndex = 0;
-            foreach (var domainEvent in aggregate.DomainEvents)
+            foreach (var raised in aggregate.DomainEvents)
             {
-                eventIndex++;
-                var perEventVersion = preSaveVersion + eventIndex;
-                var data = IntegrationEventMapper.Map(aggregate, domainEvent, perEventVersion);
+                var data = IntegrationEventMapper.Map(aggregate, raised);
                 outboxMessages.Add(new OutboxMessage
                 {
                     Id = data.EventId,
@@ -71,9 +59,6 @@ public class ProductRepository(WriteDbContext context) : IProductWriteRepository
             context.OutboxMessages.AddRange(outboxMessages);
             await context.SaveChangesAsync(cancellationToken);
 
-            // Debezium's logical decoding still captures the INSERTs in the WAL even though we
-            // delete the rows immediately. This keeps the OutboxMessages table empty without
-            // requiring a separate cleanup job.
             var ids = outboxMessages.Select(m => m.Id).ToArray();
             await context.OutboxMessages
                 .Where(m => ids.Contains(m.Id))

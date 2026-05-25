@@ -3,10 +3,6 @@ using Domain.Products.ReadModels;
 
 namespace Domain.Products.Projections;
 
-/// <summary>
-/// Translates integration events into the canonical <see cref="ProductDetailReadModel"/>.
-/// The list view is derived from the detail view via <see cref="IProductListProjector"/>.
-/// </summary>
 public interface IProductProjector
 {
     ProductDetailReadModel Apply(ProductCreatedIntegrationEvent @event);

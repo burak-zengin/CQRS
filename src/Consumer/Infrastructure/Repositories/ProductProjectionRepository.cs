@@ -73,7 +73,6 @@ public sealed class ProductProjectionRepository : IProductProjectionRepository
         }
         catch (MongoWriteException ex) when (ex.WriteError?.Category == ServerErrorCategory.DuplicateKey)
         {
-            // Already marked by a concurrent consumer; safe to ignore.
         }
     }
 

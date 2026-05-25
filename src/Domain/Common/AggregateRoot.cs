@@ -1,10 +1,8 @@
-using Domain.Products.Events;
-
 namespace Domain.Common;
 
 public abstract class AggregateRoot
 {
-    private readonly List<IDomainEvent> _domainEvents = new();
+    private readonly List<RaisedDomainEvent> _domainEvents = new();
 
     public int Version { get; protected set; }
 
@@ -12,14 +10,14 @@ public abstract class AggregateRoot
 
     public DateTimeOffset UpdatedAt { get; protected set; }
 
-    public IReadOnlyCollection<IDomainEvent> DomainEvents => _domainEvents.AsReadOnly();
+    public IReadOnlyCollection<RaisedDomainEvent> DomainEvents => _domainEvents.AsReadOnly();
 
     public void ClearDomainEvents() => _domainEvents.Clear();
 
     protected void RaiseEvent(IDomainEvent domainEvent, DateTimeOffset occurredAt)
     {
-        _domainEvents.Add(domainEvent);
         Version++;
+        _domainEvents.Add(new RaisedDomainEvent(domainEvent, Version));
         UpdatedAt = occurredAt;
     }
 }

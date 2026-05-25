@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Domain.Common;
 using Domain.Products;
 using Domain.Products.Events;
 using Domain.Products.IntegrationEvents;
@@ -18,16 +19,16 @@ public static class IntegrationEventMapper
 {
     private const string ProductAggregateType = "Product";
 
-    // Serialize enums as strings so the wire format is stable and human-readable,
-    // and so it matches the consumer's deserializer (which uses JsonStringEnumConverter).
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         Converters = { new JsonStringEnumConverter() }
     };
 
-    public static OutboxMessageData Map(Product aggregate, IDomainEvent domainEvent, int version)
+    public static OutboxMessageData Map(Product aggregate, RaisedDomainEvent raised)
     {
-        var eventId = Guid.NewGuid();
+        var domainEvent = raised.Event;
+        var eventId = domainEvent.EventId;
+        var version = raised.AggregateVersion;
         var aggregateId = aggregate.Id.Value.ToString();
 
         return domainEvent switch

@@ -1,3 +1,5 @@
+using Domain.Common;
+
 namespace Domain.Products.Events;
 
 public sealed record ProductVariantRemovedDomainEvent(Guid ProductId, Guid VariantId) : IDomainEvent

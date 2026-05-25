@@ -1,7 +1,4 @@
-﻿using System.Text;
-using System.Text.Json;
-using Confluent.Kafka;
-using Confluent.Kafka.Admin;
+﻿using Confluent.Kafka;
 using Consumer.Infrastructure.Messaging;
 using Consumer.Infrastructure.Persistence;
 using Consumer.Infrastructure.Projections;
@@ -10,6 +7,8 @@ using Domain.Products.Projections;
 using Domain.Products.Repositories;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using System.Text;
+using System.Text.Json;
 
 MongoConfiguration.RegisterClassMaps();
 
@@ -91,7 +90,6 @@ try
 
         if (result.Message.Value is null)
         {
-            // Tombstones / delete records on the outbox table -- skip but commit to avoid stuck partition.
             Console.WriteLine(
                 $"[Consumer] Null value at {result.Topic}[{result.Partition}]@{result.Offset} -- committing offset.");
             consumer.Commit(result);
@@ -205,7 +203,6 @@ static bool TryResolveEventId(Headers? headers, string? payload, out Guid eventI
     }
     catch (JsonException)
     {
-        // fall through
     }
 
     eventId = default;

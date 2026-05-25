@@ -9,7 +9,6 @@ public static class MongoConfiguration
 {
     public static void RegisterClassMaps()
     {
-        // Persist Guid as String for portability and easy log inspection across services.
         BsonSerializer.TryRegisterSerializer(new GuidSerializer(BsonType.String));
 
         if (!BsonClassMap.IsClassMapRegistered(typeof(ProductDetailVariantItem)))
